@@ -91,10 +91,10 @@ if gPMV != 3:
 # Windows or Linux?
 gWINDOWS = (sys.platform == 'win32')
 gLINUX = (sys.platform == 'linux2')
-# Path to library?
+# Library path?
 if   gWINDOWS:
     try:    import l_dummy
-    except: sys.path.append('N:/P/LIB2')    # <<< Path to library.
+    except: sys.path.append('N:/P/G/plib2')    # <<< Library path.
     import l_dummy
 elif gLINUX:
     raise NotImplementedError('Linux not supported')
