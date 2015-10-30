@@ -12,8 +12,7 @@
 *dump*
 zz*.*
 yy*.*
-cpwsgi.py
-runserver.py
+15*/
 /__pycache__
 !freeze.txt
 !notes.txt
