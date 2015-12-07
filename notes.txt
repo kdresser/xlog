@@ -15,15 +15,17 @@
   16     	|
   17	15	UTCUT TimeStamp sent by logging server client
   32		|
-  33	 4	SRC id	
+  33	 4	SRC id: Client ID: major
   37		|
-  38	 1	ERR level (0..5 usually)
-  39		|
-  40	 1	SUB level 
-  41		|
-  42	40	SHA1 of contents string
-  82		|
-  83	var	Contents string (json of dict)
+  38	 4	SUB id: Client ID: minor
+  42		|
+  43	 1	ERR level (0..5 usually)
+  44		|
+  45	 1	SUB level: Custom
+  46		|
+  47	40	SHA1 of contents string
+  87		|
+  88	var	Contents string (json of dict)
 
 ###
 
@@ -33,9 +35,11 @@
 	_ts	Usually supplied by logging server client, but filled in by logging server if not.
                 If any of the following are omitted, they are filled with '_' chars.
 	_id	SRC id (length 4)
+	_si	SUB id (length 4)
 	_el	ERR level (length 1) (0..5 usually)
 	_sl	SUB level (length 1)
 
+??? _msg?
   
   nginx (nx01) keys:
 
@@ -90,6 +94,11 @@
 150917:		xlog.py: new version being tested on C1.
 		mxlog.py:	In \p\lib\, for sending to xlog.
 		mxlogtxrx.py:	In \p\lib\, for use by mxlog.py.
+
+151207:		C:\XLOG\app\ is working master (via PTVS)
+		N:\P\G\xlog\ is git'd mirror of working master.
+		new xlog.py, testxlog.py xviewer.py
+		new l_xlog.py
 
 ###
 

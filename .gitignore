@@ -13,6 +13,9 @@
 zz*.*
 yy*.*
 15*/
+save/
 /__pycache__
 !freeze.txt
 !notes.txt
+!nginxCLF.txt
+

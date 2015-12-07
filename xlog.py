@@ -46,7 +46,9 @@ Options:
 ###         : If any of the following are omitted, they are filled 
 ###           with '_' chars.
 ###	    _id	: SRC id (length 4, alphanumeric)
-###           Identifies the client app.
+###           Identifies the client/app: major.
+###	    _si	: SUB id (length 4, alphanumeric)
+###           Identifies the client/app: minor.
 ###	    _el	: ERR level (length 1) (numeric, 0..5 usually)
 ###           Usually the Python level numbers, but *nix levels
 ###           could be represented by letters, e.g., 'a'..'g' 
@@ -84,22 +86,12 @@ import shutil, collections, pickle, copy, json
 import queue, threading, hashlib, importlib
 from socketserver import BaseRequestHandler, TCPServer, ThreadingMixIn
 
-# Python version?
-gPMV = sys.version_info[0]
-if gPMV != 3:
-    raise ValueError('not Python 3')
-# Windows or Linux?
-gWINDOWS = (sys.platform == 'win32')
-gLINUX = (sys.platform == 'linux2')
-# Library path?
-if   gWINDOWS:
-    try:    import l_dummy
-    except: sys.path.append('N:/P/G/plib2')    # <<< Library path.
-    import l_dummy
-elif gLINUX:
-    raise NotImplementedError('Linux not supported')
-else:
-    raise ValueError('unknown platform: %s' % repr(sys.platform))
+gP2 = (sys.version_info[0] == 2)
+gP3 = (sys.version_info[0] == 3)
+assert gP3, 'requires Python 3'
+
+gWIN = sys.platform.startswith('win')
+gLIN = sys.platform.startswith('lin')
 
 ####################################################################################################
 
@@ -107,10 +99,10 @@ import l_dt as _dt              # Date, time helpers.
 import l_misc as _m              
 
 import l_screen_writer
-screen_writer = l_screen_writer.ScreenWriter()             
+_sw = l_screen_writer.ScreenWriter()             
 
 import l_simple_logger 
-_sl = l_simple_logger.SimpleLogger(screen_writer=screen_writer)
+_sl = l_simple_logger.SimpleLogger(screen_writer=_sw)
 
 DEVTEST = True                  # During dev/test, for more output.
 
@@ -135,6 +127,9 @@ if VERBOSE:
 
 ENCODING    = 'utf-8'             
 ERRORS      = 'strict'
+
+_ = '\t'    # Tab is the new |.
+FFV = '1'   # Flatfile version (151101: Version added, _si added, '\t' instead of '|').
 
 ####################################################################################################
 
@@ -233,8 +228,6 @@ def current_log_pfn():
 
 ####################################################################################################
 
-# !LFT!
-
 # Log file writing thread.
 
 LFQ = None              # Log File Queue (to output thread).
@@ -242,22 +235,27 @@ LFT = None              # Log File Thread.
 LFTSTOP = None          # Log File Thread signal to STOP.
 LFTSTOPPED = None       # Log File Thread has responded to LFTSTOP.
 
-def has_xsts(logrec):
-    return bool(logrec[10] == '.' and logrec[:10].isdigit and logrec[15] == '|')
+def QQSVhas_xsts(logrec):
+    return bool(logrec[10] == '.' and logrec[:10].isdigit and logrec[15] == _)
 
 def reformatLogRec(logrec):
+    """Add a prefix to a sorted source logrec."""
+    #
     #  In: 0.0.0.0|{...json dict payload...} 
     # Out: (rc, rm, newrec)
     #   rc: True (OK), False
     #   rm: 'OK' or errmsg
-    #   newrec:
+    #   newrec:  151101: Added _si.
+    #                    | -> \t
+    #                    Added FFV.
     #       timestamps, defaults, SHA1 and sorted json dict into a flatfile record:
-    #       '%s|%s|%s|%s|%s|%s|%s\n' %(UTC_TS_STR, _ts, _id, _el, _sl, sha1x, jslda)        
+    #       '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' %(FFV, UTC_TS_STR, _ts, _id, _si, _sl, _el, _sl, sha1x, jslda)
+    #       
     rc, rm, newrec = False, '???', None
     try:
         # logrec: tx-ip|payload.
         try:
-            _ip, payload = logrec.split('|', 1)
+            _ip, payload = logrec.split(_, 1)
         except Exceptions as E:
             errmsg = 'split _ip|payload: %s' % E
             _sl.error(errmsg)#$#
@@ -289,11 +287,13 @@ def reformatLogRec(logrec):
         # Get a new realtime ts.
         update_ts()
         # Retrieve fields needed for the logrec prefix.  Supply '_' defaults.
-        _ts, _id, _el, _sl = \
-            logdict.get('_ts'), logdict.get('_id', '____'), logdict.get('_el', '_'), logdict.get('_sl', '_')
+        _ts, _id, _si, _el, _sl = \
+            logdict.get('_ts'), logdict.get('_id', '____'), logdict.get('_si', '____'), logdict.get('_el', '_'), logdict.get('_sl', '_')
         # Convert int's to str's.
         if isinstance(_id, int):
             _id = '%04d' % _id
+        if isinstance(_si, int):
+            _si = '%04d' % _si
         if isinstance(_el, int):
             _el = '%d' % _el
         if isinstance(_sl, int):
@@ -309,10 +309,11 @@ def reformatLogRec(logrec):
         h = hashlib.sha1()
         h.update(jsldab)
         sha1x = h.hexdigest()
-        # Remake logrec, decorated.
-        newrec = '%s|%s|%s|%s|%s|%s|%s\n' %(UTC_TS_STR, _ts, _id, _el, _sl, sha1x, jslda)        
-        #                                   ^           ^ optionally supplied by sender
-        #                                   ^ realtime xlog arrival ts
+        # A new logrec: a fat prefix + json'd sorted input dict.
+        newrec = '%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n' %(FFV, _, UTC_TS_STR, _, _ts, _, _id, _, _si, _, _el, _, _sl, _, sha1x, _, jslda)        
+        #                                                         |              | Optionally supplied by sender.
+        #                                                         |              | Defaults to UTC_TS_STR.               
+        #                                                         | Realtime xlog arrival ts.
         rc, rm = True, 'OK'
     except Exception as E:
         errmsg = 'reformatLogRec: %s @ %s' % (E, _m.tblineno())
@@ -323,9 +324,9 @@ def reformatLogRec(logrec):
         return (rc, rm, newrec)
 
 def logFileThread():  
-    """Consume LFQ, writing to a log file."""
+    """Consume LFQ, writing to the log file."""
     # Additionally, when VERBOSE, write to screen.
-    # Now, when VERBOSE, the log file can be null.
+    # When VERBOSE, the log file can be null.
     global SQUAWKED
     global CHK_UTC_TS, LOG_PFN, LFTSTOPPED
     me = 'LFT'
@@ -364,7 +365,7 @@ def logFileThread():
                             LOG_FILE.flush()                # Flush.
                             os.fsync(LOG_FILE.fileno())     # Flush.
                             if (not VERBOSE) and rplrc:
-                                _ms.iw('.')
+                                _sw.iw('.')
                                 rplrc = 0
                     else:
                         if not VERBOSE:
@@ -373,20 +374,22 @@ def logFileThread():
                     1/1
                     if not VERBOSE:
                         raise ValueError('no LOG_FILE from: ' + LOG_PFN)
-                # To screen?
+                # Additionally to screen?
                 if VERBOSE:
                     try:    
-                        a = logrec.split('|', 6)
+                        a = logrec.split(_, 9)
+                        ffv = a.pop(0)
                         b = json.loads(a.pop(-1))
-                        b['ml'] = _sl
+                        b['sl'] = _sl
                         ###
-                        id, el, sl, msg = b['_id'], b['_el'], b['_sl'], b['_msg']
+                        id, si, el, sl, msg = b['_id'], b['_si'], b['_el'], b['_sl'], b.get('_msg', 'None')
                         ###
                         VM.main(*a, **b)
-                    except: 
-                        # In case ml goes bad...
+                    except Exception as E: 
+                        errmsg = str(E)
+                        # In case _sl burps...
                         _m.beeps(3)
-                        print('!! ' + logrec + ' !!')
+                        print('!! ' + logrec + ' !! ' + errmsg + ' !!')
             except queue.Empty:
                 pass
     except Exception as E:
@@ -451,7 +454,7 @@ def handle_connection(skt, address):
                     else:
                         # Should be a log record.
                         # Add the source IP.
-                        logrec = address[0] + '|' + rx
+                        logrec = address[0] + _ + rx
                         # Reformat to final log file format.
                         (rc, rm, newrec) = reformatLogRec(logrec)
                         # Queue to log file writing thread.
@@ -531,8 +534,8 @@ def main():
         startLogFileThread()
 
         # Fake a log record from self.  Fake the json'd dict.  Use '0.0.0.0' as self.
-        z = '%s|{"_id": "%s", "_el": %d, "_sl": "%s", "_msg": "%s"}' %\
-            ('0.0.0.0', '----', 0, '_', (me + ' begins @ %s' % _dt.ut2iso(_dt.locut())))
+        z = '%s%s{"_id": "%s", "_si": "%s", "_el": %d, "_sl": "%s", "_msg": "%s"}' %\
+            ('0.0.0.0', _, '----', '----', 0, '_', (me + ' begins @ %s' % _dt.ut2iso(_dt.locut())))
         (rc, rm, newrec) = reformatLogRec(z)
         LFQ.put(newrec)
 
@@ -573,8 +576,8 @@ def main():
         # A '!STOP!' record or a KeyboardInterrupt or an Exception...
         if LFT:
             # Fake a received log record.
-            z = '%s|{"_id": "%s", "_el": %d, "_sl": "%s", "_msg": "%s"}' %\
-                ('0.0.0.0', '----', 0, '_', (me + ' ends @ %s' % _dt.ut2iso(_dt.locut())))
+            z = '%s%s{"_id": "%s", "_el": %d, "_sl": "%s", "_msg": "%s"}' %\
+                ('0.0.0.0', _, '----', 0, '_', (me + ' ends @ %s' % _dt.ut2iso(_dt.locut())))
             (rc, rm, newrec) = reformatLogRec(z)
             LFQ.put(newrec)
 

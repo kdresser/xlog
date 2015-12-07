@@ -1,0 +1,18 @@
+
+nginx CLF (the default)
+
+log_format combined '$remote_addr - $remote_user [$time_local]  '
+                    '"$request" $status $body_bytes_sent '
+                    '"$http_referer" "$http_user_agent"';
+
+01: $remote_addr
+02: -
+03: $remote_user (or -)
+04: [$time_local]
+05: "$request"
+06: $status
+07: $body_bytes_sent
+08: "$http_referer"
+09: "$http_user_agent"
+
+###
