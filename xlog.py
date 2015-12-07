@@ -21,6 +21,8 @@ Options:
 
 #> !P3!
 
+#> 2v1
+
 ###
 ### xlog: - A server for accepting and storing log messaged from 
 ###         TCP/IP-connected clients.
