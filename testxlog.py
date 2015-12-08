@@ -104,7 +104,7 @@ def test():
                     xl.null(msg, srcid=':%03d'%(101+x), subid='.%03d'%(201+x))
                     1/1
 
-                if False:
+                if True:
                     # 1: simple str message sent via msg2xlog()
                     msg = 'n%03d' % (x+1)
                     _sl.info('1: %s' % msg)
@@ -117,7 +117,7 @@ def test():
                     xl.logd2xlog(logd)
                     1/1
 
-                if True:
+                if False:
                     # 3: ready-to-use json'd dict sent via logdj2xlog()
                     logd = {'_id': ':%03d'%(501+x), '_si': '.%03d'%(601+x), '_el': 5, '_sl': 6, '_msg': 'n%03d' % (x+1), 'n': x+1}
                     logdj = json.dumps(logd, ensure_ascii=ENSURE_ASCII, sort_keys=SORT_KEYS)
@@ -126,33 +126,10 @@ def test():
 
                 time.sleep(float(RATE))
 
-                '''...
-                z = '{"_id": "%s", "_si": "%s", "_el": "0", "_sl": "_", "_msg": "n%03d", "n": %d}' % (SRCID, SUBID, x+1, x+1, )
-                msg = 'n%03d' % (x+1)
-                n = x + 1
-                z = {'_id': SRCID, '_si': SUBID, '_el': '0', '_sl': '_', '_msg': msg, 'n': n}
-                xl.null(z)
-                _sl.info(str(z))#$#
-                ...'''
             1/1
-            xl.null(None)
-            1/1
-            xl.null(None)
-            1/1
-            xl.null('!TEST1!')
-            1/1
-            xl.null('!TEST2!')
-            1/1
-            '''...
-            rx = xl.txrx('!FOO!')
-            if rx:
-                rx = rx.rstrip()
-                rx = rx
-            1/1
-            ...'''
-            ###time.sleep(33)
             while xl.busy():
-                time.sleep(0.2)
+                _m.beep()
+                time.sleep(0.5)
             xl.close()
             1/1
 
@@ -195,4 +172,5 @@ if __name__ == '__main__':
 ### --srcid=0001 --subid=___a  --el=0  --sl=_  --count=22  --rate=0 --hp=192.168.100.1:12321
 ### --srcid=0001 --subid=___a  --el=0  --sl=_  --count=2  --rate=0 --hp=192.168.100.1:12321
 ###
-
+### --srcid=0001 --subid=___a  --el=0  --sl=_  --count=22  --rate=0 --hp=192.168.100.5:12321
+###

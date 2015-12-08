@@ -42,12 +42,10 @@ Options:
 ###
 ### Client sends a json'd dict of KV's:
 ###
-###   Keys that xlog looks for when processing a logrec:
-###	    _ip : IP of logging server client
-###	    _ts	: UTC float, usually supplied by logging server client, 
-###           but will be filled in with the rx timestamp if not.
-###         : If any of the following are omitted, they are filled 
-###           with '_' chars.
+###   The keys that xlog uses when flatfiling a client tx:
+###
+###	    _ip : IP of logging server's client
+###	    _ts	: UTC float, client's tx timestamp (or rx if none)
 ###	    _id	: SRC id (length 4, alphanumeric)
 ###           Identifies the client/app: major.
 ###	    _si	: SUB id (length 4, alphanumeric)
@@ -57,32 +55,66 @@ Options:
 ###           could be represented by letters, e.g., 'a'..'g' 
 ###           for 0..7.
 ###	    _sl	: SUB level (length 1, alphanumeric)
-###           An arbitrary flag column.  Could be used to aid in
-###           filtering xlog's flatfile.
+###           An arbitrary flag column, to aid filtering xlog's 
+###           flatfile.
 ###
-###  Other keys, probably without a '_' prefix, will be specific 
-###  to the client.
+###         (_id, _si, _el, _sl default to '_' chars)
+###
+###  All keys remain in the KV lump for downstreamers.
 ###
 
 ### 
 ### The flatfile output from xlog:
 ###
-###  Col   Len  Contents                            : From 
-###  ---   ---  -----------------------------------   ------
-###   01	15	UTCUT TimeStamp when received       : server
-###   16     	|
-###   17	15	UTCUT TimeStamp                     : client
-###   32		|
-###   33	 4	SRC id    (4 chars, digits)         : client
-###   37		|
-###   38	 1	ERR level (1 char: 0..5 usually)    : client
-###   39		|
-###   40	 1	SUB level (1 char)                  : client
-###   41		|
-###   42	40	SHA1 of contents string             : client
-###   82		|
-###   83	var	Contents string (json of dict)      : client
-### 
+### OLD version (implicitly FFV 0), using | delimiters.
+###
+###
+###  Col   Len  Contents                           
+###  ---   ---  -----------------------------------
+###   01    15	UTCUT TimeStamp: server rx
+###   16     |
+###   17    15	UTCUT TimeStamp: client tx
+###   32     |
+###   33     4	SRC id: Client ID: Major
+###   37     |
+###   38     4	SUB id: Client ID: Minor
+###   42     |
+###   43     1	ERR level (0..5 usually)
+###   44     |
+###   45     1	SUB level: Custom
+###   46     |
+###   47    40	SHA1 of contents string
+###   87     |
+###   88   var	Contents string (json of dict)
+###
+### rrrrrrrrrrrrrrr|ttttttttttttttt|IIII|iiii|E|e|ssssssssssssssssssssssssssssssssssssssss|{...}
+### ....:....1....:....2....:....3....:....4....:....5....:....6....:....7....:....8....:....9....:....A
+###
+### NEW version (explicitly FFV 1), using \t delimiters.
+###
+###  Col   Len  Contents                           
+###  ---   ---  -----------------------------------
+###   01     1  FlatFile Version ('1')
+###   02     _
+###   03    15	UTCUT TimeStamp: server rx
+###   18     _
+###   19    15	UTCUT TimeStamp: client tx
+###   34     _
+###   35     4	SRC id: Client ID: Major
+###   39     _
+###   40     4	SUB id: Client ID: Minor
+###   44     _
+###   45     1	ERR level (0..5 usually)
+###   46     _
+###   47     1	SUB level: Custom
+###   48     _
+###   49    40	SHA1 of contents string
+###   89     _
+###   90   var	Contents string (json of dict)
+###
+### 1_rrrrrrrrrrrrrrr_ttttttttttttttt_IIII_iiii_E_e_ssssssssssssssssssssssssssssssssssssssss_{...}
+### ....:....1....:....2....:....3....:....4....:....5....:....6....:....7....:....8....:....9....:....A
+###
 
 import os, sys, stat, time, datetime, calendar
 import shutil, collections, pickle, copy, json
@@ -241,9 +273,6 @@ LFQ = None              # Log File Queue (to output thread).
 LFT = None              # Log File Thread.
 LFTSTOP = None          # Log File Thread signal to STOP.
 LFTSTOPPED = None       # Log File Thread has responded to LFTSTOP.
-
-def QQSVhas_xsts(logrec):
-    return bool(logrec[10] == '.' and logrec[:10].isdigit and logrec[15] == _)
 
 def reformatLogRec(logrec):
     """Add a prefix to a sorted source logrec."""

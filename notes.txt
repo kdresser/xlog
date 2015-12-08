@@ -9,37 +9,11 @@
 	
 ###
 
-  FLATFILE WRITTEN BY SERVER:
+  !!! SEE XLOG.PY FOR FLATFILE RECORD LAYOUTS !!!
 
-  01	15	UTCUT TimeStamp when rx'd by logging server
-  16     	|
-  17	15	UTCUT TimeStamp sent by logging server client
-  32		|
-  33	 4	SRC id: Client ID: major
-  37		|
-  38	 4	SUB id: Client ID: minor
-  42		|
-  43	 1	ERR level (0..5 usually)
-  44		|
-  45	 1	SUB level: Custom
-  46		|
-  47	40	SHA1 of contents string
-  87		|
-  88	var	Contents string (json of dict)
+  !!! SEE XLOG.PY FOR KEYS USED FROM THE LOG DICT !!!
 
 ###
-
-  Contents dictionary (common keys):
-
-	_ip	IP of logging server client
-	_ts	Usually supplied by logging server client, but filled in by logging server if not.
-                If any of the following are omitted, they are filled with '_' chars.
-	_id	SRC id (length 4)
-	_si	SUB id (length 4)
-	_el	ERR level (length 1) (0..5 usually)
-	_sl	SUB level (length 1)
-
-??? _msg?
   
   nginx (nx01) keys:
 
