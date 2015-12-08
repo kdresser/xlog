@@ -14,6 +14,7 @@ zz*.*
 yy*.*
 15*/
 save/
+xlog.ini
 /__pycache__
 xlog.ini
 !freeze.txt
