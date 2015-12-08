@@ -22,6 +22,7 @@ Options:
 #> !P3!
 
 #> 2v1
+#> 2v2 : debug missing verbose output
 
 ###
 ### xlog: - A server for accepting and storing log messaged from 
@@ -126,6 +127,10 @@ if VERBOSE:
         errmsg = 'no VIEWER module name'
         raise ValueError(errmsg)
     VM = importlib.import_module(VIEWER)
+    _sl.info('imported %s -> %s' % (VIEWER, repr(VM)))
+else:
+    VIEWER = VM = None
+    _sl.info('not VERBOSE')
 
 ENCODING    = 'utf-8'             
 ERRORS      = 'strict'
@@ -531,6 +536,9 @@ def main():
         _sl.info('       hp: ' + str(HP))
         _sl.info(' log_path: ' + LOG_PATH)
         _sl.info('  verbose: ' + str(VERBOSE))
+        if VERBOSE:
+            _sl.info('   viewer: ' + str(VIEWER))
+            _sl.info('       vm: ' + repr(VM))
         _sl.info()
 
         startLogFileThread()
