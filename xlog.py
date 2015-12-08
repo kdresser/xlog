@@ -5,7 +5,7 @@ xlog: A server for accepting and storing log messages from
 * Copyright (c) 2015 J. Kelly Dresser, kellydresser@gmail.com
 
 Usage:
-  xlog.py [--ini=<ini> --host=<host> --ippfx=<ippfx> --port=<port> --log_path=<log_path> -v --verbose]
+  xlog.py [--ini=<ini> --host=<host> --ippfx=<ippfx> --port=<port> --log_path=<log_path> --verbose=<verbose>]
   xlog.py (-h | --help | --version)
 
 Options:
@@ -16,13 +16,13 @@ Options:
   --ippfx=<ippfx>        Host pfx (for shortening logging).
   --port=<port>          Port.
   --log_path=<log_path>  Flat-file log path.
-  -v --verbose           verbose: lines, not dots, to screen
+  --verbose=<verbose>    True, 1 -> lines, not dots, to screen
 """
 
 #> !P3!
 
 #> 2v1
-#> 2v2 : debug missing verbose output
+#> 2v2 : fix missing verbose output
 
 ###
 ### xlog: - A server for accepting and storing log messaged from 
