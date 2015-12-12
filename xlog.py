@@ -24,6 +24,7 @@ Options:
 #> 2v1
 #> 2v2 : fix missing verbose output
 #> 2v3 : minor upgrades
+#> 2v4 : new logfile roller
 
 ###
 ### xlog: - A server for accepting and storing log messaged from 
@@ -173,8 +174,6 @@ _sw = l_screen_writer.ScreenWriter()
 
 import l_simple_logger 
 _sl = l_simple_logger.SimpleLogger(screen_writer=_sw)
-
-DEVTEST = True                  # During dev/test, for more output.
 
 import l_args as _a             # INI + command line args.
 ME = _a.get_args(__doc__, '0.1')
@@ -398,7 +397,8 @@ def logFileThread():
     # No thread-local vars bcs only one thread.
     _sl.extra(me + ' begins')
     try:          
-        rplrc = 0       # Records per log roll check (at each record that's more than 1s after it's predecessor).
+        rplrc = 0           # Records per log roll check.
+        wlpfn = None       # Working version of LOG_PFN.
         while True:
             if LFTSTOP:
                 _sl.extra('STOPping')#$#
@@ -406,40 +406,49 @@ def logFileThread():
                 log_close()
                 return
             try:        
-                # Consume the input queue, with a timeout.
+
+                # Get a logrec from the input queue, with a 1-sec timeout.
                 logrec = LFQ.get(block=True, timeout=1).rstrip()    # Strip the '\n'.
-                # Log file?  (Can be null when VERBOSE.)
-                logpfn = current_log_pfn()
-                if logpfn:
-                    1/1
-                    # Log roll?  Or log create?  Then output to flatfile.
-                    log_roll_checked = False                # Used to spread out logfile flushing.
+                
+                # Log file?  (Via LOG_PATH. Can be null when VERBOSE.)
+                if LOG_PATH:
+
+                    # Log roll check every 1-sec.
                     if UTC_TS > (CHK_UTC_TS + 1):
-                        CHK_UTC_TS = UTC_TS    
-                        logpfn = logpfn###current_log_pfn()
-                        if logpfn != LOG_PFN:
+                        CHK_UTC_TS = UTC_TS
+                        # Were there records in the previous 1-sec?
+                        if rplrc > 0:
+                            # Flush.
+                            LOG_FILE.flush()                
+                            os.fsync(LOG_FILE.fileno())     
+                            # Dots?
+                            if not VERBOSE:
+                                _sw.iw('.')
+                        rplrc = 0
+                        # Log roll?
+                        wlpfn = current_log_pfn()
+                        if wlpfn != LOG_PFN:
                             log_close()
-                            LOG_PFN = logpfn
-                        log_roll_checked = True
+                            LOG_PFN = wlpfn
+
+                    # Ensure LOG_FILE.
                     if not LOG_FILE:
                         log_open()
+
+                    # Output.
                     if LOG_FILE:
-                        LOG_FILE.write(logrec + '\n')       # Output.
+                        LOG_FILE.write(logrec + '\n')
                         rplrc += 1
-                        if log_roll_checked:
-                            LOG_FILE.flush()                # Flush.
-                            os.fsync(LOG_FILE.fileno())     # Flush.
-                            if (not VERBOSE) and rplrc:
-                                _sw.iw('.')
-                                rplrc = 0
                     else:
-                        if not VERBOSE:
-                            raise ValueError('no LOG_FILE from: ' + LOG_PFN)
+                        errmsg = '!!!'                          # !TODO!
+                        print('** no LOG_FILE:', LOG_PFN)#$#
+                
+                # No log file?
                 else:
-                    1/1
                     if not VERBOSE:
                         raise ValueError('no LOG_FILE from: ' + LOG_PFN)
-                # Additionally to screen?
+
+                # VERBOSE? (Custom output to screen.)
                 if VERBOSE:
                     try:    
                         a = logrec.split(_, 9)
@@ -456,6 +465,7 @@ def logFileThread():
                         _m.beeps(3)
                         print('!! ' + logrec + ' !! ' + errmsg + ' !!')
                         1/1
+
             except queue.Empty:
                 pass
     except Exception as E:
@@ -629,7 +639,7 @@ def xlog():
     except KeyboardInterrupt as E:
         errmsg = '{}: KeyboardInterrupt: {}'.format(me, E)
         DOSQUAWK(errmsg, beeps=1)
-        raise
+        pass###raise
     except Exception as E:
         errmsg = '{}: E: {} @ {}'.format(me, E, _m.tblineno())
         DOSQUAWK(errmsg)
@@ -702,15 +712,11 @@ if __name__ == '__main__':
         xlog()
     except KeyboardInterrupt as E:
         errmsg = '{}: KeyboardInterrupt: {}'.format(ME, E)
-        DOSQUAWKED(errmsg, beeps=1)
-        raise
+        DOSQUAWK(errmsg, beeps=1)
+        pass###raise
     except Exception as E:
         errmsg = '{}: E: {} @ {}'.format(ME, E, _m.tblineno())
-        DOSQUAWKED(errmsg)
-        '''...
-        if DEVTEST:
-            raise
-        ...'''
+        DOSQUAWK(errmsg)
         raise
     finally:
         try:  LOG_FILE.close()
