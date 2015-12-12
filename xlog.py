@@ -1,5 +1,5 @@
 """
-xlog: A server for accepting and storing log messages from 
+xlog: A server for receiving and storing log messages from 
       clients via TCP/IP.
 * Licensed under terms of MIT license (see LICENSE-MIT)
 * Copyright (c) 2015 J. Kelly Dresser, kellydresser@gmail.com
@@ -23,6 +23,7 @@ Options:
 
 #> 2v1
 #> 2v2 : fix missing verbose output
+#> 2v3 : minor upgrades
 
 ###
 ### xlog: - A server for accepting and storing log messaged from 
@@ -62,6 +63,28 @@ Options:
 ###
 ###  All keys remain in the KV lump for downstreamers.
 ###
+
+###
+### The Python error levels (00..50 divided by 10):
+###
+###   0: NOTSET
+###   1: DEBUG
+###   2: INFO
+###   3: WARNING
+###   4: ERROR
+###   5: CRITICAL
+###   
+
+###
+### The message prefixes added by l_simple_logger methods:
+###
+###   NULL          __
+###   DEBUG         ..
+###   INFO          --
+###   WARNING       >>
+###   ERROR         **
+###   CRITICAL      !!
+###   EXTRA         ~~              (Probably a bad idea.)
 
 ### 
 ### The flatfile output from xlog:
@@ -130,6 +153,18 @@ gLIN = sys.platform.startswith('lin')
 
 ####################################################################################################
 
+SQUAWKED = False                # To suppress chained exception messages.
+def DOSQUAWK(errmsg, beeps=3):
+    """For use in exception blocks."""
+    global SQUAWKED
+    if not SQUAWKED:
+        _m.beeps(beeps)
+        for em in errmsg.split('\n'):
+            _sl.error(em)
+        SQUAWKED = True
+
+####################################################################################################
+
 import l_dt as _dt              # Date, time helpers.
 import l_misc as _m              
 
@@ -140,8 +175,6 @@ import l_simple_logger
 _sl = l_simple_logger.SimpleLogger(screen_writer=_sw)
 
 DEVTEST = True                  # During dev/test, for more output.
-
-SQUAWKED = False                # To suppress chained exception messages.
 
 import l_args as _a             # INI + command line args.
 ME = _a.get_args(__doc__, '0.1')
@@ -167,7 +200,7 @@ else:
 ENCODING    = 'utf-8'             
 ERRORS      = 'strict'
 
-_ = '\t'    # Tab is the new |.
+_ = '\t'    # Tab is the new | (separator for fields in prefix).
 FFV = '1'   # Flatfile version (151101: Version added, _si added, '\t' instead of '|').
 
 ####################################################################################################
@@ -200,7 +233,6 @@ LOG_FILE = None                     # Current log file handle.
 # it will appear in the flatfile record prefix, but in a contemporarily
 # named flatfile.
 def update_ts(utcut=None):
-    global SQUAWKED
     global UTC_TS, UTC_UT, UTC_TS_STR, UTC_YMD, UTC_HMS, LOC_YMD, LOC_HMS
     me = 'update_ts(%r)' % utcut
     try:
@@ -218,11 +250,8 @@ def update_ts(utcut=None):
         LOC_HMS = '%02d%02d%02d' % (loc.tm_hour, loc.tm_min, loc.tm_sec)
         1/1
     except Exception as E:
-        if not SQUAWKED:
-            _m.beeps(3)
-            errmsg = '{}: {} @ {}'.format(me, E, m.tblineno())
-            _sl.error(errmsg)#$#
-            SQUAWKED = True
+        errmsg = '{}: {} @ {}'.format(me, E, m.tblineno())
+        DOSQUAWK(errmsg)
         raise
 
 # ...TSLOCK
@@ -274,7 +303,7 @@ LFT = None              # Log File Thread.
 LFTSTOP = None          # Log File Thread signal to STOP.
 LFTSTOPPED = None       # Log File Thread has responded to LFTSTOP.
 
-def reformatLogRec(logrec):
+def reformatLogrec(logrec):
     """Add a prefix to a sorted source logrec."""
     #
     #  In: 0.0.0.0|{...json dict payload...} 
@@ -287,6 +316,7 @@ def reformatLogRec(logrec):
     #       timestamps, defaults, SHA1 and sorted json dict into a flatfile record:
     #       '%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' %(FFV, UTC_TS_STR, _ts, _id, _si, _sl, _el, _sl, sha1x, jslda)
     #       
+    me = 'reformatLogrec'
     rc, rm, newrec = False, '???', None
     try:
         # logrec: tx-ip|payload.
@@ -352,7 +382,7 @@ def reformatLogRec(logrec):
         #                                                         | Realtime xlog arrival ts.
         rc, rm = True, 'OK'
     except Exception as E:
-        errmsg = 'reformatLogRec: %s @ %s' % (E, _m.tblineno())
+        errmsg = '%s: %s @ %s' % (me, E, _m.tblineno())
         _sl.error(errmsg)#$#
         rc, rm, = False, errmsg
         # Swallow the exception.
@@ -363,11 +393,10 @@ def logFileThread():
     """Consume LFQ, writing to the log file."""
     # Additionally, when VERBOSE, write to screen.
     # When VERBOSE, the log file can be null.
-    global SQUAWKED
     global CHK_UTC_TS, LOG_PFN, LFTSTOPPED
     me = 'LFT'
     # No thread-local vars bcs only one thread.
-    _sl.extra('LFT begins')#$#
+    _sl.extra(me + ' begins')
     try:          
         rplrc = 0       # Records per log roll check (at each record that's more than 1s after it's predecessor).
         while True:
@@ -423,21 +452,19 @@ def logFileThread():
                         VM.main(*a, **b)
                     except Exception as E: 
                         errmsg = str(E)
-                        # In case _sl burps...
+                        # In case _sl is incapacitated...
                         _m.beeps(3)
                         print('!! ' + logrec + ' !! ' + errmsg + ' !!')
+                        1/1
             except queue.Empty:
                 pass
     except Exception as E:
-        if not SQUAWKED:
-            errmsg = '{}: {} @ {}'.format(me, E, _m.tblineno())
-            _sl.error(errmsg)#$#
-            errmsg = 'LFT: logrec: ' + repr(logrec)
-            _sl.error(errmsg)#$#
-            SQUAWKED = True
+        errmsg = '%s: %s @ %s' % (me, E, _m.tblineno()) + '\n' + \
+                 '%s: LR: %s' % (me, repr(logrec))
+        DOSQUAWK(errmsg)
         raise
     finally:
-        _sl.extra('LFT ends')#$#
+        _sl.extra(me + ' ends')
 
 def startLogFileThread():
     global LFQ, LFT
@@ -463,8 +490,7 @@ def create_server_socket(address):
     return listener
 
 def handle_connection(skt, address):
-    global SQUAWKED
-    global NCX, NOCX, STOP
+    global NCX, NOCX, XLOGSTOP
     try:
         NCX += 1
         NOCX += 1
@@ -485,14 +511,14 @@ def handle_connection(skt, address):
                         tx = b'OK|' + rx.encode(encoding=ENCODING, errors=ERRORS)
                     elif rx == '!STOP!':
                         1/1
-                        STOP = True
+                        XLOGSTOP = True
                         tx = b'OK'
                     else:
                         # Should be a log record.
                         # Add the source IP.
                         logrec = address[0] + _ + rx
                         # Reformat to final log file format.
-                        (rc, rm, newrec) = reformatLogRec(logrec)
+                        (rc, rm, newrec) = reformatLogrec(logrec)
                         # Queue to log file writing thread.
                         if rc:
                             LFQ.put(newrec)
@@ -551,10 +577,13 @@ class Handler(BaseRequestHandler):
 class ThreadedServer(ThreadingMixIn, TCPServer):
     allow_reuse_address = 1
 
-STOP = None             # A shutdown signal set by some some request handler ('!STOP!').
+XLOGSTOP = None             # Distinct from LFTSTOP.  Used for remote shutdown via '!STOP!'.
 
-def main():
-    global SQUAWKED, LFTSTOP 
+#
+# main: xlog
+#
+def xlog():
+    global LFTSTOP 
     me, action = 'main', ''
     try:
         _sl.info(me + ' begins')#$#
@@ -575,7 +604,7 @@ def main():
         # Fake a log record from self.  Fake the json'd dict.  Use '0.0.0.0' as self.
         z = '%s%s{"_id": "%s", "_si": "%s", "_el": %d, "_sl": "%s", "_msg": "%s"}' %\
             ('0.0.0.0', _, '----', '----', 0, '_', (me + ' begins @ %s' % _dt.ut2iso(_dt.locut())))
-        (rc, rm, newrec) = reformatLogRec(z)
+        (rc, rm, newrec) = reformatLogrec(z)
         LFQ.put(newrec)
 
         _sl.info('starting server on %r' % (HP, ))
@@ -588,7 +617,7 @@ def main():
         _sl.info('server running in %s' % server_thread.name)
 
         while True:
-            if STOP:
+            if XLOGSTOP:
                 break
             time.sleep(1)
 
@@ -598,33 +627,21 @@ def main():
         server.server_close()
         
     except KeyboardInterrupt as E:
-        if not SQUAWKED:
-            _m.beeps(1)
-            msg = '{}: KeyboardInterrupt: {}'.format(me, E)
-            _sl.warning(msg)
-            SQUAWKED = True
-        1/1
+        errmsg = '{}: KeyboardInterrupt: {}'.format(me, E)
+        DOSQUAWK(errmsg, beeps=1)
+        raise
     except Exception as E:
-        if not SQUAWKED:
-            _m.beeps(3)
-            errmsg = '{}: E: {} @ {}'.format(me, E, _m.tblineno())
-            _sl.error(errmsg)
-            SQUAWKED = True
+        errmsg = '{}: E: {} @ {}'.format(me, E, _m.tblineno())
+        DOSQUAWK(errmsg)
         raise
     finally:
-        # A '!STOP!' record or a KeyboardInterrupt or an Exception...
+        # Either: a '!STOP!' record, a KeyboardInterrupt, or an Exception.
         if LFT:
             # Fake a received log record.
             z = '%s%s{"_id": "%s", "_el": %d, "_sl": "%s", "_msg": "%s"}' %\
                 ('0.0.0.0', _, '----', 0, '_', (me + ' ends @ %s' % _dt.ut2iso(_dt.locut())))
-            (rc, rm, newrec) = reformatLogRec(z)
+            (rc, rm, newrec) = reformatLogrec(z)
             LFQ.put(newrec)
-
-            '''...
-            # Sleep a few seconds to let the 1-second loop in the log file
-            # thread process the above message.
-            time.sleep(3)
-            ...'''
 
             # Wait some to let LFT empty tis queue.
             tw, w, mt = 0, 0.1, False
@@ -649,12 +666,10 @@ def main():
                     errmsg = 'LFT didn\'t acknowledge STOP request'
                     _sl.error(errmsg)
             except Exception as E:
-                if not SQUAWKED:
-                    _m.beeps(3)
-                    errmsg = 'LFT.join(10): %s' % E
-                    _sl.error(errmsg)
-                    SQUAWKED = True
+                errmsg = 'LFT.join(10): %s' % E
+                DOSQUAWK(errmsg)
                 raise
+
         try:  LOG_FILE.close()
         except:  pass
         _sl.info(me + ' ends')#$#
@@ -684,19 +699,19 @@ if __name__ == '__main__':
     ...'''
 
     try:
-        main()
+        xlog()
     except KeyboardInterrupt as E:
-        if not SQUAWKED:
-            msg = '{}: KeyboardInterrupt: {}'.format(ME, E)
-            _sl.warning(msg)
-        1/1
+        errmsg = '{}: KeyboardInterrupt: {}'.format(ME, E)
+        DOSQUAWKED(errmsg, beeps=1)
+        raise
     except Exception as E:
-        if not SQUAWKED:
-            _m.beeps(3)
-            errmsg = '{}: E: {} @ {}'.format(ME, E, _m.tblineno())
-            _sl.error(errmsg)
+        errmsg = '{}: E: {} @ {}'.format(ME, E, _m.tblineno())
+        DOSQUAWKED(errmsg)
+        '''...
         if DEVTEST:
             raise
+        ...'''
+        raise
     finally:
         try:  LOG_FILE.close()
         except:  pass
