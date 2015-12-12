@@ -15,7 +15,7 @@ yy*.*
 15*/
 save/
 /__pycache__
-xlog.ini
+xlog*.ini
 !freeze.txt
 !notes.txt
 !nginxCLF.txt
