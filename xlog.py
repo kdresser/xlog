@@ -247,7 +247,6 @@ def update_ts(utcut=None):
         UTC_HMS = '%02d%02d%02d' % (utc.tm_hour, utc.tm_min, utc.tm_sec)
         LOC_YMD = '%02d%02d%02d' % (loc.tm_year % 100, loc.tm_mon, loc.tm_mday)
         LOC_HMS = '%02d%02d%02d' % (loc.tm_hour, loc.tm_min, loc.tm_sec)
-        1/1
     except Exception as E:
         errmsg = '{}: {} @ {}'.format(me, E, m.tblineno())
         DOSQUAWK(errmsg)
@@ -464,7 +463,6 @@ def logFileThread():
                         # In case _sl is incapacitated...
                         _m.beeps(3)
                         print('!! ' + logrec + ' !! ' + errmsg + ' !!')
-                        1/1
 
             except queue.Empty:
                 pass
@@ -513,14 +511,11 @@ def handle_connection(skt, address):
                 if rx:
                     rx = rx.rstrip()
                     if not rx:
-                        1/1
                         continue
                         # ??? Or, should this be ACK'd with an OK?
                     if   rx[0] == '!' and rx[-1] == '!':
-                        1/1
                         tx = b'OK|' + rx.encode(encoding=ENCODING, errors=ERRORS)
                     elif rx == '!STOP!':
-                        1/1
                         XLOGSTOP = True
                         tx = b'OK'
                     else:
@@ -543,7 +538,6 @@ def handle_connection(skt, address):
                     # Respond to sender.
                     if tx:
                         skt.sendall(tx + b'\n')
-                    1/1
                 else:
                     # Connection EOF.
                     _sl.info('no more rx')
@@ -553,26 +547,22 @@ def handle_connection(skt, address):
         _m.beeps(1)
         msg = 'client socket to {} has closed'.format(address)
         _sl.warning(msg)
-        # POR.
-        1/1   
+        pass            # POR.
     except ConnectionResetError as E:
         _m.beeps(1)     # Usually not serious.
         msg = 'client {} closed connection'.format(address)
         _sl.info(msg)
-        # POR.
-        1/1
+        pass            # POR.
     except ConnectionAbortedError as E:
         _m.beeps(2)     # Perhaps a little more serious.
         msg = 'client {} aborted connection'.format(address)
         _sl.info(msg)
-        # POR.
-        1/1
+        pass            # POR.
     except Exception as E:
         _m.beeps(3)
         errmsg = 'client {} error: {} @ {}'.format(address, E, _m.tblineno())
         _sl.error(errmsg)
-        # POR.
-        1/1   
+        pass            # POR.
     finally:
         msg = 'handle_connection: close -> %d open' % NOCX
         _sl.info(msg)
@@ -664,7 +654,6 @@ def xlog():
             if not mt:
                 errmsg = 'LFT did not empty its queue'
                 _sl.error(errmsg)
-                1/1
 
             # Shut down log file writing thread.
             LFTSTOP = True
@@ -683,7 +672,6 @@ def xlog():
         try:  LOG_FILE.close()
         except:  pass
         _sl.info(me + ' ends')#$#
-        1/1
 
 # Test data
 
@@ -704,7 +692,6 @@ if __name__ == '__main__':
     t1 = time.time()
     print('%.3f ms/reformat' % (1000.0 * (t1 - t0) / 1000.0))
     # -> 0.125 ms/reformat
-    1/1
     sys.exit()
     ...'''
 
@@ -722,6 +709,3 @@ if __name__ == '__main__':
         try:  LOG_FILE.close()
         except:  pass
         _sl.info(ME + ' ends')#$#
-        1/1
-
-###
